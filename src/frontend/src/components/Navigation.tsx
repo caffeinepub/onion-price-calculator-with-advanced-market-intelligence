@@ -2,7 +2,7 @@ import { useInternetIdentity } from "@/hooks/useInternetIdentity";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useCheckAdmin } from "@/hooks/useQueries";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Bell, BellRing, Calculator, Shield, TrendingUp } from "lucide-react";
+import { Bell, BellRing, Calculator, Shield } from "lucide-react";
 
 export function Navigation() {
   const { t } = useLanguage();
@@ -14,7 +14,6 @@ export function Navigation() {
 
   const tabs = [
     { path: "/", label: t.calculator, icon: Calculator },
-    { path: "/trends", label: t.trends, icon: TrendingUp, requiresAuth: true },
     { path: "/alerts", label: t.alerts, icon: Bell, requiresAuth: true },
     {
       path: "/notifications",

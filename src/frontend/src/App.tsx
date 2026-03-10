@@ -14,7 +14,6 @@ import { Alerts } from "./pages/Alerts";
 import { Calculator } from "./pages/Calculator";
 import { Notifications } from "./pages/Notifications";
 import { TamilNaduPrices } from "./pages/TamilNaduPrices";
-import { Trends } from "./pages/Trends";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,12 +32,6 @@ const calculatorRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   component: Calculator,
-});
-
-const trendsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/trends",
-  component: Trends,
 });
 
 const alertsRoute = createRoute({
@@ -67,7 +60,6 @@ const tamilNaduPricesRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   calculatorRoute,
-  trendsRoute,
   alertsRoute,
   notificationsRoute,
   adminRoute,
