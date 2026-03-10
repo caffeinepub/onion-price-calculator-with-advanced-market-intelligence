@@ -18,6 +18,8 @@ import {
 import { useInternetIdentity } from "@/hooks/useInternetIdentity";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useGetTransactions, useSaveTransaction } from "@/hooks/useQueries";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   Calculator as CalcIcon,
   Download,
@@ -88,19 +90,7 @@ export function Calculator() {
   const cropDisplayName = cropType === "onion" ? t.onion : t.groundnut;
 
   const createShareMessage = () => {
-    return `${t.shareMessage.title}
-
-${t.shareMessage.date}: ${formattedDate}
-${t.shareMessage.time}: ${formattedTime}
-
-${t.shareMessage.cropType}: ${cropDisplayName}
-${t.shareMessage.farmer}: ${farmerName || t.shareMessage.notSpecified}
-${t.shareMessage.labor}: ${laborName || t.shareMessage.notSpecified}
-
-${t.shareMessage.quantity}: ${quantity || "0"} ${cropType === "onion" ? "kg" : t.drums}
-${t.shareMessage.price}: ₹${pricePerUnit || "0"} ${unitLabel}
-
-${t.shareMessage.total}: ₹${totalPrice || "0"}`;
+    return `${t.shareMessage.title}\n\n${t.shareMessage.date}: ${formattedDate}\n${t.shareMessage.time}: ${formattedTime}\n\n${t.shareMessage.cropType}: ${cropDisplayName}\n${t.shareMessage.farmer}: ${farmerName || t.shareMessage.notSpecified}\n${t.shareMessage.labor}: ${laborName || t.shareMessage.notSpecified}\n\n${t.shareMessage.quantity}: ${quantity || "0"} ${cropType === "onion" ? "kg" : t.drums}\n${t.shareMessage.price}: ₹${pricePerUnit || "0"} ${unitLabel}\n\n${t.shareMessage.total}: ₹${totalPrice || "0"}\n\nThank you ☺️`;
   };
 
   const saveToSpreadsheet = async () => {
@@ -112,7 +102,7 @@ ${t.shareMessage.total}: ₹${totalPrice || "0"}`;
     const weightKg = Number.parseFloat(quantity) || 0;
     const pricePerKg = Number.parseFloat(pricePerUnit) || 0;
     const totalAmount = Number.parseFloat(totalPrice || "0");
-    const timestamp = BigInt(Date.now()) * BigInt(1_000_000); // nanoseconds
+    const timestamp = BigInt(Date.now()) * BigInt(1_000_000);
 
     try {
       await saveTransactionMutation.mutateAsync({
@@ -127,7 +117,6 @@ ${t.shareMessage.total}: ₹${totalPrice || "0"}`;
 
       toast.success("Transaction saved securely to the canister!");
 
-      // Reset form fields after successful save
       setFarmerName("");
       setLaborName("");
       setQuantity("");
@@ -141,7 +130,7 @@ ${t.shareMessage.total}: ₹${totalPrice || "0"}`;
     }
   };
 
-  const downloadSpreadsheet = async () => {
+  const downloadAsPDF = async () => {
     setIsDownloading(true);
     try {
       const result = await fetchTransactions();
@@ -152,51 +141,103 @@ ${t.shareMessage.total}: ₹${totalPrice || "0"}`;
         return;
       }
 
+      const doc = new jsPDF({ orientation: "landscape" });
+
+      // Title
+      doc.setFontSize(18);
+      doc.setTextColor(20, 83, 45); // dark green
+      doc.text("Transaction Report", 14, 18);
+
+      // Subtitle / generated date
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(
+        `Generated on: ${new Date().toLocaleString()}   |   Total Records: ${records.length}`,
+        14,
+        26,
+      );
+
+      // Divider
+      doc.setDrawColor(34, 197, 94); // green-500
+      doc.setLineWidth(0.5);
+      doc.line(14, 29, doc.internal.pageSize.width - 14, 29);
+
       const headers = [
-        "Farmer Name",
-        "Labor Name",
-        "Weight (kg)",
-        "Price per kg (₹)",
-        "Total Amount (₹)",
-        "Mobile Number",
-        "Timestamp",
+        [
+          "#",
+          "Farmer Name",
+          "Labor Name",
+          "Weight (kg)",
+          "Price/kg (\u20b9)",
+          "Total (\u20b9)",
+          "Mobile",
+          "Date & Time",
+        ],
       ];
 
-      const rows = records.map((r) => {
+      const rows = records.map((r, idx) => {
         const date = new Date(Number(r.timestamp) / 1_000_000).toLocaleString();
         return [
+          String(idx + 1),
           r.farmerName,
           r.laborName,
-          r.weightKg.toString(),
-          r.pricePerKg.toString(),
-          r.totalAmount.toString(),
+          r.weightKg.toFixed(2),
+          r.pricePerKg.toFixed(2),
+          r.totalAmount.toFixed(2),
           r.mobileNumber,
           date,
         ];
       });
 
-      const csvContent = [headers, ...rows]
-        .map((row) =>
-          row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
-        )
-        .join("\n");
+      autoTable(doc, {
+        head: headers,
+        body: rows,
+        startY: 33,
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: {
+          fillColor: [22, 101, 52], // green-800
+          textColor: 255,
+          fontStyle: "bold",
+        },
+        alternateRowStyles: { fillColor: [240, 253, 244] }, // green-50
+        columnStyles: {
+          0: { cellWidth: 10, halign: "center" },
+          3: { halign: "right" },
+          4: { halign: "right" },
+          5: { halign: "right", fontStyle: "bold" },
+        },
+        margin: { left: 14, right: 14 },
+        tableLineColor: [187, 247, 208], // green-200
+        tableLineWidth: 0.2,
+      });
 
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
+      // Footer note on last page
+      const pageCount = (
+        doc as unknown as { internal: { getNumberOfPages: () => number } }
+      ).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(
+          "🔒 Farmer data is secure and strictly private. | Created by Vichuu & Powered by Caffeine",
+          14,
+          doc.internal.pageSize.height - 8,
+        );
+        doc.text(
+          `Page ${i} of ${pageCount}`,
+          doc.internal.pageSize.width - 28,
+          doc.internal.pageSize.height - 8,
+        );
+      }
+
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `transactions-${today}.csv`);
-      link.style.visibility = "hidden";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      doc.save(`transaction-report-${today}.pdf`);
 
-      toast.success(`Exported ${records.length} transaction(s) as CSV.`);
+      toast.success(`Exported ${records.length} transaction(s) as PDF.`);
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : "Failed to download transactions.";
+        err instanceof Error ? err.message : "Failed to generate PDF.";
       toast.error(`Export error: ${message}`);
     } finally {
       setIsDownloading(false);
@@ -281,6 +322,7 @@ ${t.shareMessage.total}: ₹${totalPrice || "0"}`;
             >
               <SelectTrigger
                 id="cropType"
+                data-ocid="calculator.crop.select"
                 className="border-green-300 dark:border-green-800 focus:border-green-500 dark:focus:border-green-600 bg-white dark:bg-neutral-950"
               >
                 <SelectValue />
@@ -302,6 +344,7 @@ ${t.shareMessage.total}: ₹${totalPrice || "0"}`;
               </Label>
               <Input
                 id="farmerName"
+                data-ocid="calculator.farmer_name.input"
                 type="text"
                 placeholder={t.enterFarmerName}
                 value={farmerName}
@@ -319,6 +362,7 @@ ${t.shareMessage.total}: ₹${totalPrice || "0"}`;
               </Label>
               <Input
                 id="laborName"
+                data-ocid="calculator.labor_name.input"
                 type="text"
                 placeholder={t.enterLaborName}
                 value={laborName}
@@ -336,6 +380,7 @@ ${t.shareMessage.total}: ₹${totalPrice || "0"}`;
               </Label>
               <Input
                 id="quantity"
+                data-ocid="calculator.quantity.input"
                 type="number"
                 inputMode="numeric"
                 pattern="[0-9]*"
@@ -357,6 +402,7 @@ ${t.shareMessage.total}: ₹${totalPrice || "0"}`;
               </Label>
               <Input
                 id="pricePerUnit"
+                data-ocid="calculator.price.input"
                 type="number"
                 inputMode="numeric"
                 pattern="[0-9]*"
@@ -397,6 +443,7 @@ ${t.shareMessage.total}: ₹${totalPrice || "0"}`;
           <Button
             onClick={saveToSpreadsheet}
             disabled={!isFormValid || isSaving}
+            data-ocid="calculator.save.button"
             size="lg"
             variant="outline"
             className="border-2 border-green-700 text-green-800 hover:bg-green-50 dark:border-green-600 dark:text-green-300 dark:hover:bg-green-950 font-semibold py-6 text-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
@@ -413,10 +460,11 @@ ${t.shareMessage.total}: ₹${totalPrice || "0"}`;
           </p>
         </div>
 
-        {/* Download Spreadsheet button — visible to all users */}
+        {/* Download as PDF button */}
         <Button
-          onClick={downloadSpreadsheet}
+          onClick={downloadAsPDF}
           disabled={isDownloading}
+          data-ocid="calculator.download_pdf.button"
           size="lg"
           variant="outline"
           className="border-2 border-green-600 text-green-900 hover:bg-green-100 dark:text-green-100 dark:hover:bg-green-950 font-semibold py-6 text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
@@ -426,7 +474,7 @@ ${t.shareMessage.total}: ₹${totalPrice || "0"}`;
           ) : (
             <Download className="w-6 h-6 mr-2" />
           )}
-          {isDownloading ? "Exporting..." : t.downloadSpreadsheet}
+          {isDownloading ? "Generating PDF..." : "Download as PDF"}
         </Button>
       </div>
 
@@ -441,6 +489,7 @@ ${t.shareMessage.total}: ₹${totalPrice || "0"}`;
             </Label>
             <Input
               id="mobileNumber"
+              data-ocid="calculator.mobile.input"
               type="tel"
               inputMode="numeric"
               pattern="[0-9]*"
@@ -468,6 +517,7 @@ ${t.shareMessage.total}: ₹${totalPrice || "0"}`;
           <Button
             onClick={shareViaWhatsApp}
             disabled={!isFormValid}
+            data-ocid="calculator.whatsapp.button"
             size="lg"
             className="bg-green-600 hover:bg-green-700 text-white font-semibold py-6 text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -478,6 +528,7 @@ ${t.shareMessage.total}: ₹${totalPrice || "0"}`;
           <Button
             onClick={shareViaSMS}
             disabled={!isFormValid}
+            data-ocid="calculator.sms.button"
             size="lg"
             variant="outline"
             className="border-2 border-green-600 text-green-900 hover:bg-green-100 dark:text-green-100 dark:hover:bg-green-950 font-semibold py-6 text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
