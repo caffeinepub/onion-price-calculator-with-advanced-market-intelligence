@@ -9,10 +9,7 @@ import {
 import { ThemeProvider } from "next-themes";
 import { MainLayout } from "./components/MainLayout";
 import { LanguageProvider } from "./hooks/useLanguage";
-import { AdminDashboard } from "./pages/AdminDashboard";
-import { Alerts } from "./pages/Alerts";
 import { Calculator } from "./pages/Calculator";
-import { Notifications } from "./pages/Notifications";
 import { TamilNaduPrices } from "./pages/TamilNaduPrices";
 
 const queryClient = new QueryClient({
@@ -34,24 +31,6 @@ const calculatorRoute = createRoute({
   component: Calculator,
 });
 
-const alertsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/alerts",
-  component: Alerts,
-});
-
-const notificationsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/notifications",
-  component: Notifications,
-});
-
-const adminRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/admin",
-  component: AdminDashboard,
-});
-
 const tamilNaduPricesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tn-prices",
@@ -60,9 +39,6 @@ const tamilNaduPricesRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   calculatorRoute,
-  alertsRoute,
-  notificationsRoute,
-  adminRoute,
   tamilNaduPricesRoute,
 ]);
 

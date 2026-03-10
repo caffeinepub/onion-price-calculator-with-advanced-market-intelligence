@@ -1,45 +1,18 @@
-import { useInternetIdentity } from "@/hooks/useInternetIdentity";
 import { useLanguage } from "@/hooks/useLanguage";
-import { useCheckAdmin } from "@/hooks/useQueries";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Bell, BellRing, Calculator, Shield } from "lucide-react";
+import { Calculator } from "lucide-react";
 
 export function Navigation() {
   const { t } = useLanguage();
-  const { identity } = useInternetIdentity();
-  const isAuthenticated = !!identity;
-  const { data: isAdmin } = useCheckAdmin();
   const router = useRouterState();
   const currentPath = router.location.pathname;
 
-  const tabs = [
-    { path: "/", label: t.calculator, icon: Calculator },
-    { path: "/alerts", label: t.alerts, icon: Bell, requiresAuth: true },
-    {
-      path: "/notifications",
-      label: t.notifications,
-      icon: BellRing,
-      requiresAuth: true,
-    },
-    {
-      path: "/admin",
-      label: t.adminDashboard,
-      icon: Shield,
-      requiresAuth: true,
-      requiresAdmin: true,
-    },
-  ];
-
-  const visibleTabs = tabs.filter((tab) => {
-    if (tab.requiresAdmin && !isAdmin) return false;
-    if (tab.requiresAuth && !isAuthenticated) return false;
-    return true;
-  });
+  const tabs = [{ path: "/", label: t.calculator, icon: Calculator }];
 
   return (
     <nav className="mb-8">
       <div className="flex flex-wrap gap-2 justify-center">
-        {visibleTabs.map((tab) => {
+        {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = currentPath === tab.path;
 
